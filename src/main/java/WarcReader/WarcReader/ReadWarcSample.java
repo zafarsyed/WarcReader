@@ -2,7 +2,6 @@ package WarcReader.WarcReader;
 
 import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
@@ -12,14 +11,9 @@ import java.util.concurrent.Future;
 import java.util.zip.GZIPInputStream;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.cmu.lemurproject.WarcRecord;
-import edu.cmu.lemurproject.WarcHTMLResponseRecord;
 
 public class ReadWarcSample {
 	
-	private static FileWriter fw;
-	private static WarcRecord thisWarcRecord;
-	private static WarcHTMLResponseRecord htmlRecord;
 	public static GZIPInputStream gzInputStream;
 	public static DataInputStream inStream;
 	public static ObjectMapper mapper;
@@ -27,6 +21,7 @@ public class ReadWarcSample {
 	public static void main(String[] args) throws IOException {
 		String inputDirectory = args[0];
 		String outputdirectory = args[1];
+		int numOfThreads = Integer.parseInt(args[2]);
 		Set<String> results = new HashSet<String>();
 		Set<WarcReaderCallable> callables = new HashSet<WarcReaderCallable>();
 		final File folder = new File(inputDirectory);
@@ -36,7 +31,7 @@ public class ReadWarcSample {
 		
 		try
 		{
-			ExecutorService executor = Executors.newFixedThreadPool(2);
+			ExecutorService executor = Executors.newFixedThreadPool(numOfThreads);
 			for(Future<String> result : executor.invokeAll(callables))
 			{
 				results.add(result.get());

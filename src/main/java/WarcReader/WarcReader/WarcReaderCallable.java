@@ -1,6 +1,7 @@
 package WarcReader.WarcReader;
 
 import java.io.DataInputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
@@ -9,6 +10,8 @@ import java.util.concurrent.Callable;
 import java.util.zip.GZIPInputStream;
 
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -34,10 +37,9 @@ public class WarcReaderCallable implements Callable<String> {
 		this.fileName = fileName;
 		this.outputLocation = outputLocation;
 		this.gzInputStream = new GZIPInputStream(new FileInputStream(this.fileLocation+this.fileName));
-		this.fw = new FileWriter(this.outputLocation+this.fileName+".json");
+		this.fw = new FileWriter(new File(this.outputLocation+this.fileName+".json"));
 		this.inStream = new DataInputStream(gzInputStream);
-		this.mapper = new ObjectMapper();
-		
+		this.mapper = new ObjectMapper();		
 	}
 
 	public String call() throws Exception {
@@ -54,11 +56,21 @@ public class WarcReaderCallable implements Callable<String> {
 				docCount++;
 				// it is - create a WarcHTML record
 				//				WarcReader reader = new WarcReaderCompressed();
-				htmlRecord=new WarcHTMLResponseRecord(thisWarcRecord);
+				this.htmlRecord=new WarcHTMLResponseRecord(thisWarcRecord);
 				// get our TREC ID and target URI
 				String thisTRECID=htmlRecord.getTargetTrecID();
 				String thisTargetURI=htmlRecord.getTargetURI();
-				String articleText = Jsoup.parse(htmlRecord.getRawRecord().getContentUTF8()).select("p").text().replaceAll("\\s+", " ");
+				//System.out.println(Jsoup.parse(htmlRecord.getRawRecord().getContentUTF8()).html());
+				Elements paras = Jsoup.parse(htmlRecord.getRawRecord().getContentUTF8()).select("p");
+				String articleText = "";
+				for (Element element : paras) {
+					element.select("a").remove();
+					element.select("div").remove();
+					element.select("links").remove();
+					articleText = articleText +" "+ element.text();
+					articleText = articleText.replace("|", "");
+					articleText = articleText.replace("\u00a0", "");
+				}
 				if(articleText.isEmpty())
 				{
 					//System.out.println("No Text");
@@ -67,12 +79,11 @@ public class WarcReaderCallable implements Callable<String> {
 				}
 				else
 				{
-
+					//System.out.println(articleText);
 					objectNode1.put("Article", articleText);
 					objectNode1.put("URL", thisTargetURI);
 					fw.write("{\"index\": {\"_id\":\""+thisTRECID+"\"}}" + "\n");
 					fw.write(objectNode1.toString() + "\n");
-
 				}
 
 			}

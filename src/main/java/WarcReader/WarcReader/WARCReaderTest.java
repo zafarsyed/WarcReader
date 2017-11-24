@@ -26,8 +26,6 @@ public class WARCReaderTest {
 		// The file name identifies the ArchiveReader and indicates if it should be decompressed
 		ArchiveReader ar = WARCReaderFactory.get(fn, is, true);
 		
-		// Once we have an ArchiveReader, we can work through each of the records it contains
-		int i = 0;
 		for(ArchiveRecord r : ar) {
 			// The header file contains information such as the type of record, size, creation time, and URL
 			System.out.println(r.getHeader());
