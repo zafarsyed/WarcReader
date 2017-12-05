@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.zip.GZIPInputStream;
 
+import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -48,21 +49,31 @@ public class WarcReaderCallable implements Callable<String> {
 		
 		int docCount = 0;
 		int emptyFiles = 0;
+		int samedocs = 0;
 		// cast to a data input stream
 		
-		
-		ObjectNode objectNode1 = mapper.createObjectNode();		
+		System.out.println("Processing File "+fileName);
+		ObjectNode objectNode1 = mapper.createObjectNode();
+		String previousText = "";
 		while ((this.thisWarcRecord=WarcRecord.readNextWarcRecord(inStream))!=null) {
 			// see if it's a response record
 			if (this.thisWarcRecord.getHeaderRecordType().equals("response")) {
+				
 				docCount++;
 				// it is - create a WarcHTML record
 				//				WarcReader reader = new WarcReaderCompressed();
 				this.htmlRecord=new WarcHTMLResponseRecord(this.thisWarcRecord);
+				if(this.htmlRecord.getRawRecord().getContentUTF8().contains("Content-Type: text/plain"))
+				{
+					emptyFiles++;
+					continue;
+				}
 				// get our TREC ID and target URI
 				Document document = Jsoup.parse(this.htmlRecord.getRawRecord().getContentUTF8());
 				String thisTRECID=this.htmlRecord.getTargetTrecID();
 				String thisTargetURI=this.htmlRecord.getTargetURI();
+//				System.out.println(thisTRECID);
+//				System.out.println(thisTargetURI);
 				String docTitle = document.title();
 				Elements paras = document.select("p");
 				this.articleText = "";
@@ -71,6 +82,11 @@ public class WarcReaderCallable implements Callable<String> {
 					element.select("div").remove();
 					element.select("links").remove();
 					String eleText = element.text().replace("\u00a0", "");
+					//eleText = eleText.replaceAll("[^a-zA-Z0-9.,!{}\":;\'?/\\|()&%@#]", " ").replaceAll("\\s+", " ");
+					/*if(thisTRECID.equals("clueweb12-1100wb-15-21352"))
+					{
+						System.out.println(eleText);
+					}*/
 					if(this.articleText.isEmpty() && !(eleText.isEmpty()))
 					{
 						this.articleText = this.articleText + eleText;
@@ -81,15 +97,24 @@ public class WarcReaderCallable implements Callable<String> {
 				}
 				this.articleText = this.articleText.replace("|", "");
 				this.articleText = this.articleText.replace("\u00a0", "");
-				if(this.articleText.isEmpty())
+				this.articleText = this.articleText.replaceAll("[^a-zA-Z0-9.,!{}\":;'’<>?/\\()$&%@#-=_]", " ").replaceAll("\\s+", " ");
+				
+				if(this.articleText.isEmpty() || this.articleText.length()<100)
 				{
 					//System.out.println("No Text");
 					emptyFiles++;
 					continue;
 				}
+				
+				if(StringUtils.equals(previousText, this.articleText))
+				{
+					samedocs++;
+					continue;
+				}
 				else
 				{
 					//System.out.println(articleText);
+					//System.out.println(this.articleText);
 					if(docTitle.isEmpty())
 						docTitle = "No Document Title";
 					objectNode1.put("Title", docTitle);
@@ -97,14 +122,15 @@ public class WarcReaderCallable implements Callable<String> {
 					objectNode1.put("URL", thisTargetURI);
 					fw.write("{\"index\": {\"_id\":\""+thisTRECID+"\"}}" + "\n");
 					fw.write(objectNode1.toString() + "\n");
+					previousText = this.articleText;
 				}
 
 			}
 		}
 		fw.close();
 		inStream.close();
-		
-		return "Number of documents read for "+this.fileName+ " is "+(docCount-emptyFiles) ;
+		System.out.println("Finished processing file "+fileName+" Identical doc count "+samedocs);
+		return "Number of documents read for "+this.fileName+ " is "+(docCount-(emptyFiles+samedocs)) ;
 	}
 
 }
