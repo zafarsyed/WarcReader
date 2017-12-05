@@ -52,7 +52,6 @@ public class WarcReaderCallable implements Callable<String> {
 		int samedocs = 0;
 		// cast to a data input stream
 		
-		System.out.println("Processing File "+fileName);
 		ObjectNode objectNode1 = mapper.createObjectNode();
 		String previousText = "";
 		while ((this.thisWarcRecord=WarcRecord.readNextWarcRecord(inStream))!=null) {
@@ -129,8 +128,7 @@ public class WarcReaderCallable implements Callable<String> {
 		}
 		fw.close();
 		inStream.close();
-		System.out.println("Finished processing file "+fileName+" Identical doc count "+samedocs);
-		return "Number of documents read for "+this.fileName+ " is "+(docCount-(emptyFiles+samedocs)) ;
+		return "Number of documents read for "+this.fileName+ " is "+(docCount-(emptyFiles+samedocs)+" Identical doc count "+samedocs) ;
 	}
 
 }
